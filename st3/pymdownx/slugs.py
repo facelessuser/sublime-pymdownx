@@ -21,32 +21,68 @@ THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABI
 CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
-import sys
+from __future__ import unicode_literals
 import re
 import unicodedata
 from . import util
-PY3 = sys.version_info >= (3, 0) and sys.version_info < (4, 0)
 
-RE_TAGS = re.compile(r'''</?[^>]*>''', re.UNICODE)
-RE_WORD = re.compile(r'''[^\w\- ]''', re.UNICODE)
+RE_TAGS = re.compile(r'</?[^>]*>', re.UNICODE)
+RE_INVALID_SLUG_CHAR = re.compile(r'[^\w\- ]', re.UNICODE)
+RE_SEP = re.compile(r' ', re.UNICODE)
+RE_ASCII_LETTERS = re.compile(r'[A-Z]', re.UNICODE)
+
+NO_CASED = 0
+UNICODE_CASED = 1
+CASED = 2
 
 
-def uslugify(text, sep):
+def uslugify(text, sep, cased=NO_CASED, percent_encode=False):
     """Unicode slugify (utf-8)."""
 
     # Normalize, Strip html tags, strip leading and trailing whitespace, and lower
-    tag_id = RE_TAGS.sub('', unicodedata.normalize('NFKD', text)).strip().lower()
+    slug = RE_TAGS.sub('', unicodedata.normalize('NFC', text)).strip()
+
+    if cased == NO_CASED:
+        slug = slug.lower()
+    elif cased == UNICODE_CASED:
+
+        def lower(m):
+            """Lowercase character."""
+            return m.group(0).lower()
+
+        slug = RE_ASCII_LETTERS.sub(lower, slug)
+
     # Remove non word characters, non spaces, and non dashes, and convert spaces to dashes.
-    return RE_WORD.sub('', tag_id).replace(' ', sep)
+    slug = RE_SEP.sub(sep, RE_INVALID_SLUG_CHAR.sub('', slug))
+
+    return util.quote(slug.encode('utf-8')) if percent_encode else slug
 
 
 def uslugify_encoded(text, sep):
-    """Custom slugify (percent encoded)."""
+    """Unicode slugify (percent encoded)."""
 
-    # Strip html tags and lower
-    tag_id = RE_TAGS.sub('', unicodedata.normalize('NFKD', text)).lower()
-    # Remove non word characters or non spaces and dashes
-    # Then convert spaces to dashes
-    tag_id = RE_WORD.sub('', tag_id).replace(' ', sep)
-    # Encode anything that needs to be
-    return util.quote(tag_id.encode('utf-8'))
+    return uslugify(text, sep, percent_encode=True)
+
+
+def uslugify_cased(text, sep):
+    """Unicode slugify cased (keep case) (utf-8)."""
+
+    return uslugify(text, sep, cased=CASED)
+
+
+def uslugify_cased_encoded(text, sep):
+    """Unicode slugify cased (keep case) (percent encoded)."""
+
+    return uslugify(text, sep, cased=CASED, percent_encode=True)
+
+
+def gfm(text, sep):
+    """Unicode slugify cased (cased Unicode only) (utf-8)."""
+
+    return uslugify(text, sep, cased=UNICODE_CASED)
+
+
+def gfm_encoded(text, sep):
+    """Unicode slugify cased (cased Unicode only) (percent encoded)."""
+
+    return uslugify(text, sep, cased=UNICODE_CASED, percent_encode=True)
