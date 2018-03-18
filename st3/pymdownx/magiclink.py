@@ -3,7 +3,7 @@ Magic Link.
 
 pymdownx.magiclink
 An extension for Python Markdown.
-Find http|ftp links and email address and turn them to actual links
+Find HTML, FTP links, and email address and turn them to actual links
 
 MIT license.
 
@@ -25,7 +25,6 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import unicode_literals
 from markdown import Extension
-from markdown.inlinepatterns import LinkPattern, Pattern
 from markdown.treeprocessors import Treeprocessor
 from markdown import util as md_util
 from . import util
@@ -34,12 +33,20 @@ import warnings
 import re
 import os
 
+try:
+    from markdown.inlinepatterns import LinkPattern, Pattern
+    LEGACY = True
+except ImportError:  # pragma: no cover
+    from markdown.inlinepatterns import LinkInlineProcessor, Pattern
+    LEGACY = False
+
 MAGIC_LINK = 1
 MAGIC_AUTO_LINK = 2
 
+
 # Bare link/email detection
 RE_MAIL = r'''(?xi)
-(
+(?P<mail>
     (?<![-/\+@a-z\d_])(?:[-+a-z\d_]([-a-z\d_+]|\.(?!\.))*)  # Local part
     (?<!\.)@(?:[-a-z\d_]+\.)                                # @domain part start
     (?:(?:[-a-z\d_]|(?<!\.)\.(?!\.))*)[a-z]\b               # @domain.end (allow multiple dot names)
@@ -48,7 +55,7 @@ RE_MAIL = r'''(?xi)
 '''
 
 RE_LINK = r'''(?xi)
-(
+(?P<link>
     (?:(?<=\b)|(?<=_))(?:
         (?:ht|f)tps?://(?:(?:[^_\W][-\w]*(?:\.[-\w.]+)+)|localhost)|  # (http|ftp)://
         (?P<www>w{3}\.)[^_\W][-\w]*(?:\.[-\w.]+)+                     # www.
@@ -288,7 +295,7 @@ class _MagiclinkReferencePattern(_MagiclinkShorthandPattern):
 
 
 class MagicShortenerTreeprocessor(Treeprocessor):
-    """Treeprocessor that finds repo issue and commit links and shortens them."""
+    """Tree processor that finds repo issue and commit links and shortens them."""
 
     # Repo link types
     ISSUE = 0
@@ -376,7 +383,7 @@ class MagicShortenerTreeprocessor(Treeprocessor):
         link.set('title', '%s %s: %s%s%s' % (label, issue_type, user_repo.rstrip('/'), separator, value))
 
     def shorten(self, link, provider, link_type, user_repo, value, url, hash_size):
-        """Shorten url."""
+        """Shorten URL."""
 
         label = PROVIDER_INFO[provider]['provider']
         prov_class = 'magiclink-%s' % provider
@@ -481,30 +488,57 @@ class MagicShortenerTreeprocessor(Treeprocessor):
         return root
 
 
-class MagiclinkPattern(LinkPattern):
-    """Convert html, ftp links to clickable links."""
+if LEGACY:
+    class MagiclinkPattern(LinkPattern):
+        """Convert html, ftp links to clickable links."""
 
-    def handleMatch(self, m):
-        """Handle URL matches."""
+        ANCESTOR_EXCLUDES = ('a',)
 
-        el = md_util.etree.Element("a")
-        el.text = md_util.AtomicString(m.group(2))
-        if m.group("www"):
-            href = "http://%s" % m.group(2)
-        else:
-            href = m.group(2)
-            if self.config['hide_protocol']:
-                el.text = md_util.AtomicString(el.text[el.text.find("://") + 3:])
-        el.set("href", self.sanitize_url(self.unescape(href.strip())))
+        def handleMatch(self, m):
+            """Handle URL matches."""
 
-        if self.config.get('repo_url_shortener', False):
-            el.set('magiclink', md_util.text_type(MAGIC_LINK))
+            el = md_util.etree.Element("a")
+            el.text = md_util.AtomicString(m.group('link'))
+            if m.group("www"):
+                href = "http://%s" % m.group('link')
+            else:
+                href = m.group('link')
+                if self.config['hide_protocol']:
+                    el.text = md_util.AtomicString(el.text[el.text.find("://") + 3:])
+            el.set("href", self.sanitize_url(self.unescape(href.strip())))
 
-        return el
+            if self.config.get('repo_url_shortener', False):
+                el.set('magiclink', md_util.text_type(MAGIC_LINK))
+
+            return el
+
+else:  # pragma: no cover
+    class MagiclinkPattern(LinkInlineProcessor):
+        """Convert html, ftp links to clickable links."""
+
+        ANCESTOR_EXCLUDES = ('a',)
+
+        def handleMatch(self, m, data):
+            """Handle URL matches."""
+
+            el = md_util.etree.Element("a")
+            el.text = md_util.AtomicString(m.group('link'))
+            if m.group("www"):
+                href = "http://%s" % m.group('link')
+            else:
+                href = m.group('link')
+                if self.config['hide_protocol']:
+                    el.text = md_util.AtomicString(el.text[el.text.find("://") + 3:])
+            el.set("href", self.sanitize_url(self.unescape(href.strip())))
+
+            if self.config.get('repo_url_shortener', False):
+                el.set('magiclink', md_util.text_type(MAGIC_LINK))
+
+            return el, m.start(0), m.end(0)
 
 
 class MagiclinkAutoPattern(Pattern):
-    """Return a link Element given an autolink `<http://example/com>`."""
+    """Return a link Element given an auto link `<http://example/com>`."""
 
     def handleMatch(self, m):
         """Return link optionally without protocol."""
@@ -521,8 +555,10 @@ class MagiclinkAutoPattern(Pattern):
         return el
 
 
-class MagiclinkMailPattern(LinkPattern):
+class MagiclinkMailPattern(Pattern):
     """Convert emails to clickable email links."""
+
+    ANCESTOR_EXCLUDES = ('a',)
 
     def email_encode(self, code):
         """Return entity definition by code, or the code if not defined."""
@@ -532,7 +568,7 @@ class MagiclinkMailPattern(LinkPattern):
         """Handle email link patterns."""
 
         el = md_util.etree.Element("a")
-        email = self.unescape(m.group(2))
+        email = self.unescape(m.group('mail'))
         href = "mailto:%s" % email
         el.text = md_util.AtomicString(''.join([self.email_encode(ord(c)) for c in email]))
         el.set("href", ''.join([md_util.AMP_SUBSTITUTE + '#%d;' % ord(c) for c in href]))
@@ -541,6 +577,8 @@ class MagiclinkMailPattern(LinkPattern):
 
 class MagiclinkMentionPattern(_MagiclinkShorthandPattern):
     """Convert @mention to links."""
+
+    ANCESTOR_EXCLUDES = ('a',)
 
     def handleMatch(self, m):
         """Handle email link patterns."""
@@ -567,6 +605,8 @@ class MagiclinkMentionPattern(_MagiclinkShorthandPattern):
 
 class MagiclinkRepositoryPattern(_MagiclinkShorthandPattern):
     """Convert @user/repo to links."""
+
+    ANCESTOR_EXCLUDES = ('a',)
 
     def handleMatch(self, m):
         """Handle email link patterns."""
@@ -596,6 +636,8 @@ class MagiclinkRepositoryPattern(_MagiclinkShorthandPattern):
 
 class MagiclinkExternalRefsPattern(_MagiclinkReferencePattern):
     """Convert repo#1, user/repo#1, repo!1, user/repo!1, repo@hash, or user/repo@hash to links."""
+
+    ANCESTOR_EXCLUDES = ('a',)
 
     def handleMatch(self, m):
         """Handle email link patterns."""
@@ -637,6 +679,8 @@ class MagiclinkExternalRefsPattern(_MagiclinkReferencePattern):
 class MagiclinkInternalRefsPattern(_MagiclinkReferencePattern):
     """Convert #1, !1, and commit_hash."""
 
+    ANCESTOR_EXCLUDES = ('a',)
+
     def handleMatch(self, m):
         """Handle email link patterns."""
 
@@ -666,7 +710,7 @@ class MagiclinkInternalRefsPattern(_MagiclinkReferencePattern):
 
 
 class MagiclinkExtension(Extension):
-    """Add Easylink extension to Markdown class."""
+    """Add auto link and link transformation extensions to Markdown class."""
 
     def __init__(self, *args, **kwargs):
         """Initialize."""
@@ -713,7 +757,7 @@ class MagiclinkExtension(Extension):
         super(MagiclinkExtension, self).__init__(*args, **kwargs)
 
     def setup_autolinks(self, md, config):
-        """Setup autolinks."""
+        """Setup auto links."""
 
         # Setup general link patterns
         auto_link_pattern = MagiclinkAutoPattern(RE_AUTOLINK, md)
