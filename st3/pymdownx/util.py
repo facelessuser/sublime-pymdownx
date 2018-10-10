@@ -14,6 +14,7 @@ PY3 = sys.version_info >= (3, 0)
 PY34 = sys.version_info >= (3, 4)
 
 if PY3:
+    ustr = str  # noqa
     uchr = chr  # noqa
     from urllib.request import pathname2url, url2pathname  # noqa
     from urllib.parse import urlparse, urlunparse, quote  # noqa
@@ -24,6 +25,7 @@ if PY3:
     else:  # pragma: no cover
         html_unescape = HTMLParser().unescape  # noqa
 else:
+    ustr = unicode  # noqa
     uchr = unichr  # noqa
     from urllib import pathname2url, url2pathname, quote  # noqa
     from urlparse import urlparse, urlunparse  # noqa
@@ -34,6 +36,49 @@ RE_WIN_DRIVE_LETTER = re.compile(r"^[A-Za-z]$")
 RE_WIN_DRIVE_PATH = re.compile(r"^[A-Za-z]:(?:\\.*)?$")
 RE_URL = re.compile('(http|ftp)s?|data|mailto|tel|news')
 IS_NARROW = sys.maxunicode == 0xFFFF
+RE_WIN_DEFAULT_PROTOCOL = re.compile(r"^///[A-Za-z]:(?:/.*)?$")
+
+if sys.platform.startswith('win'):
+    _PLATFORM = "windows"
+elif sys.platform == "darwin":  # pragma: no cover
+    _PLATFORM = "osx"
+else:
+    _PLATFORM = "linux"
+
+
+def is_win():  # pragma: no cover
+    """Is Windows."""
+
+    return _PLATFORM == "windows"
+
+
+def is_linux():  # pragma: no cover
+    """Is Linux."""
+
+    return _PLATFORM == "linux"
+
+
+def is_mac():  # pragma: no cover
+    """Is macOS."""
+
+    return _PLATFORM == "osx"
+
+
+def url2path(path):
+    """Path to URL."""
+
+    return url2pathname(path)
+
+
+def path2url(url):
+    """URL to path."""
+
+    path = pathname2url(url)
+    # If on windows, replace the notation to use a default protocol `///` with nothing.
+    if is_win() and RE_WIN_DEFAULT_PROTOCOL.match(path):
+        path = path.replace('///', '', 1)
+    return path
+
 
 if IS_NARROW:
     def get_code_points(s):
