@@ -1,5 +1,5 @@
 """PyMdown extra extensions."""
-from pep562 import Pep562
+from .pep562 import Pep562
 from .__meta__ import __version__, __version_info__
 import sys
 import warnings
