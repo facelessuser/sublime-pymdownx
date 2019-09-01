@@ -30,13 +30,13 @@ from markdown import util as md_util
 import re
 from . import util
 
-# We need to ignore theseas they are used in Markdown processing
+# We need to ignore these as they are used in Markdown processing
 STX = '\u0002'
 ETX = '\u0003'
 ESCAPE_RE = r'\\(.)'
 ESCAPE_NO_NL_RE = r'\\([^\n])'
 HARDBREAK_RE = r'\\\n'
-UNESCAPE_PATTERN = re.compile('%s(\d+)%s' % (md_util.STX, md_util.ETX))
+UNESCAPE_PATTERN = re.compile(r'%s(\d+)%s' % (md_util.STX, md_util.ETX))
 
 
 class EscapeAllPattern(InlineProcessor):

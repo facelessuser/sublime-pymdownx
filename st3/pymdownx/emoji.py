@@ -32,11 +32,11 @@ RE_EMOJI = r'(:[+\-\w]+:)'
 SUPPORTED_INDEXES = ('emojione', 'gemoji', 'twemoji')
 UNICODE_VARIATION_SELECTOR_16 = 'fe0f'
 EMOJIONE_SVG_CDN = 'https://cdn.jsdelivr.net/emojione/assets/svg/'
-EMOJIONE_PNG_CDN = 'https://cdn.jsdelivr.net/emojione/assets/4.0/png/64/'
-TWEMOJI_SVG_CDN = 'https://twemoji.maxcdn.com/2/svg/'
-TWEMOJI_PNG_CDN = 'https://twemoji.maxcdn.com/2/72x72/'
-GITHUB_UNICODE_CDN = 'https://assets-cdn.github.com/images/icons/emoji/unicode/'
-GITHUB_CDN = 'https://assets-cdn.github.com/images/icons/emoji/'
+EMOJIONE_PNG_CDN = 'https://cdn.jsdelivr.net/emojione/assets/4.5/png/64/'
+TWEMOJI_SVG_CDN = 'https://twemoji.maxcdn.com/v/latest/svg/'
+TWEMOJI_PNG_CDN = 'https://twemoji.maxcdn.com/v/latest/72x72/'
+GITHUB_UNICODE_CDN = 'https://github.githubassets.com/images/icons/emoji/unicode/'
+GITHUB_CDN = 'https://github.githubassets.com/images/icons/emoji/'
 NO_TITLE = 'none'
 LONG_TITLE = 'long'
 SHORT_TITLE = 'short'
@@ -95,7 +95,7 @@ def to_png(index, shortname, alias, uc, alt, title, category, options, md):
     is_unicode = uc is not None
     classes = options.get('classes', index)
 
-    # In genral we can use the alias, but github specific images don't have one for each alias.
+    # In general we can use the alias, but github specific images don't have one for each alias.
     # We can tell we have a github specific if there is no Unicode value.
     if is_unicode:
         image_path = options.get('image_path', def_image_path)
@@ -173,10 +173,10 @@ def to_svg_sprite(index, shortname, alias, uc, alt, title, category, options, md
     """
     Return SVG sprite element.
 
-    ~~~.html
+    ```
     <svg class="%(classes)s"><description>%(alt)s</description>
     <use xlink:href="%(sprite)s#emoji-%(unicode)s"></use></svg>
-    ~~~
+    ```
     """
 
     xlink_href = '%s#emoji-%s' % (
